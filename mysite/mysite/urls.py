@@ -4,6 +4,4 @@ from django.contrib import admin
 urlpatterns = [
     url(r'^admin/', admin.site.urls),
     url(r'^polls/', include('polls.urls')),
-    url(r'^teste/', include('teste.urls')),
-    url(r'^anaconda/', include('anaconda.urls')),
 ]
