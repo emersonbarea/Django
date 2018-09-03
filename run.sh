@@ -37,8 +37,11 @@ Note: choose the corresponding number: '
 	printf '\n\e[1;33m%-6s\e[m\n' 'Installing Nginx 1.4...'
 	sudo apt install nginx -y
       	if [ "$var_db" = "1" ] ; then
-	    printf '\n\e[1;33m%-6s\e[m\n' 'Installing MySQL Server 5.7...'
-	    sudo apt install mysql-server-5.7 -y
+            printf '\n\e[1;33m%-6s\e[m\n' 'Installing MySQL Server 5.7...'
+            sudo apt install mysql-server-5.7 -y
+            echo "mysql-server-5.7 mysql-server/root_password password root" | sudo debconf-set-selections
+            echo "mysql-server-5.7 mysql-server/root_password_again password root" | sudo debconf-set-selections
+            DEBIAN_FRONTEND=noninteractive sudo apt install mysql-server-5.7 -y
 	fi
 
         # configuration
