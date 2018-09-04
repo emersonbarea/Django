@@ -29,7 +29,7 @@ function what_to_do() {
             echo "mysql-server-5.7 mysql-server/root_password password root" | sudo debconf-set-selections
             echo "mysql-server-5.7 mysql-server/root_password_again password root" | sudo debconf-set-selections
             DEBIAN_FRONTEND=noninteractive sudo apt install mysql-server-5.7 -y
-            print '\n\e[1;33m%-6s\e[m\n' 'Creating MySQL database "django" and user "django"'
+            printf '\n\e[1;33m%-6s\e[m\n' 'Creating MySQL database "django" and user "django"'
             sudo mysql -e "CREATE DATABASE django /*\!40100 DEFAULT CHARACTER SET utf8 */;"
             sudo mysql -e "CREATE USER django@localhost IDENTIFIED BY 'django';"
             sudo mysql -e "GRANT ALL PRIVILEGES ON django.* TO 'django'@'localhost';"
@@ -47,8 +47,8 @@ function what_to_do() {
 	sudo snap install pycharm-community --classic
         printf '\n\e[1;33m%-6s\e[m\n' 'Installing Django 1.11...'
 	sudo -H pip install Django==1.11
-	printf '\n\e[1;33m%-6s\e[m\n' 'Installing Nginx 1.4...'
-	sudo apt install nginx -y
+	printf '\n\e[1;33m%-6s\e[m\n' 'Installing Nginx 1.4 e o Gunicorn3...'
+	sudo apt install nginx gunicorn3 -y
       	if [ "$var_db" = "1" ] ; then
             install_MySQL
 	fi
@@ -64,11 +64,49 @@ function what_to_do() {
     }
 
     function create_project() {
-        print 'create_project'
+
+	function project_name() {
+	    printf '\n\n%s' 'Write new Django project name: '
+            read var_project_name
+            if [ "$var_project_name" = "" ] ; then
+                printf '\e[1;31m%-6s\e[m' 'error: Write new Django project name'
+                project_name
+            fi
+	}
+
+	function project_path() {
+            printf '\n%s' 'Inform project path: '
+            read var_project_path
+            if [ "$var_project_path" = "" ] ; then
+                printf '\e[1;31m%-6s\e[m' 'error: Write a valid path'
+                project_path
+            fi
+	    if [ ! -d $var_project_path ]; then
+	        printf '\e[1;33m%-6s\e[m' 'Warning: This path does not exist. Do you want to create it? ([y],n) '
+		read var_create_path
+                if [ "$var_create_path" = "" ] || [ "$var_create_path" = "Y" ] || [ "$var_create_path" = "y" ] ; then
+                    mkdir -p $var_project_path
+		else
+		    project_path
+		fi
+	    fi
+	}
+
+	# configuration...
+        printf '\n\e[1;33m%-6s\e[m' 'You chose to create a new Django projects.'
+        project_name 
+	project_path
+        cd $var_project_path
+        django-admin startproject $var_project_name	
+
+
+
+
+
     }
 
     function create_application() {
-        print 'create_application'
+        printf 'create_application'
     }
 
     # install_django: install Django 1.11, Nginx 1.4 and ask if you want to use SQLite3 ou MySQL.
@@ -114,4 +152,10 @@ what_to_do;
 #Create new application? (Qual o nome da aplicação? Em qual projeto? Qual caminho?
 # - informar onde estão os arquivos
 # - informar como acessar URL
+
+
+# COLOCANDO EM PRODUCAO
+#settings.py
+#	ALLOWED_HOSTS = ['127.0.0.1'] #somente o proprio servidor Nginx precisa acessar o Python
+#	DEBUG = False
 
