@@ -12,20 +12,9 @@ function what_to_do() {
 
     function install_django() {
 
-        function choose_db() {
-            printf '\n\n%s\n%s\n%s\n\n%s' \
-	           'Choose what database do you want to use in Django projects:' \
-                   '    - [1] MySQL Server' '    - [2] SQLite3' 'Note: choose the corresponding number: '
-            read var_db
-            if [ "$var_db" != "1" ] && [ "$var_db" != "2" ]; then
-                printf '\e[1;31m%-6s\e[m' 'error: Choose only options 1 or 2 !!!'
-                choose_db
-            fi
-        }
-
         function install_MySQL() {
             printf '\n\e[1;33m%-6s\e[m\n' 'Installing MySQL Server 5.7...'
-            sudo apt install mysql-server-5.7 -y
+            sudo apt install mysql-server-5.7 python-mysqldb -y
             echo "mysql-server-5.7 mysql-server/root_password password root" | sudo debconf-set-selections
             echo "mysql-server-5.7 mysql-server/root_password_again password root" | sudo debconf-set-selections
             DEBIAN_FRONTEND=noninteractive sudo apt install mysql-server-5.7 -y
@@ -38,7 +27,6 @@ function what_to_do() {
 
 	# installation...
 	printf '\n\e[1;33m%-6s\e[m' 'You chose to install Django.'
-        choose_db
 	printf '\n\e[1;33m%-6s\e[m\n' 'Installing prerequisites...'
 	sudo apt update
         sudo apt install language-pack-pt -y
@@ -49,23 +37,28 @@ function what_to_do() {
 	sudo -H pip install Django==1.11
 	printf '\n\e[1;33m%-6s\e[m\n' 'Installing Nginx 1.4 e o Gunicorn3...'
 	sudo apt install nginx gunicorn3 -y
-      	if [ "$var_db" = "1" ] ; then
-            install_MySQL
-	fi
+        install_MySQL
 
-        printf '\n\e[1;33m%-6s\n%s\n%s\e[m' 'Following programs have been installed:' '    - Django 1.11' '    - Nginx 1.14'
-        if [ "$var_db" = "1" ] ; then
-            printf '\n\e[1;33m%-6s\n\n%s\n\n%s\n%s\n%s\n%s\n%s\e[m\n\n' '    - MySQL Server 5.7' \
-		   'MySQL root password = "root"' \
-		   'MySQL Django credentials: ' 'username = django' 'password = django' 'database = django' 'hostname = localhost'
-	else
-            printf '\n\e[1;33m%-6s\e[m\n\n' '    - SQLite3'
-        fi
+        printf '\n\e[1;33m%-6s\n\n%s\n%s\n%s\n%s\n\n%s\n%s\n%s\n%s\n%s\n%s\n\n\e[m' \
+	       'Following programs have been installed:' '    - Django 1.11' '    - Nginx 1.14' '    - SQLite3' \
+	       '    - MySQL Server 5.7' 'MySQL root password = "root"' 'MySQL Django credentials: ' 'username = django' \
+	       'password = django' 'database = django' 'hostname = localhost'
     }
 
     function create_project() {
 
-	function project_name() {
+        function choose_db() {
+            printf '\n\n%s\n%s\n%s\n\n%s' \
+                   'Choose the database type you want to use:' \
+                   '    - [1] MySQL Server' '    - [2] SQLite3' 'Note: choose the corresponding number: '
+            read var_db
+            if [ "$var_db" != "1" ] && [ "$var_db" != "2" ]; then
+                printf '\e[1;31m%-6s\e[m' 'error: Choose only options 1 or 2 !!!'
+                choose_db
+            fi
+        }
+
+        function project_name() {
 	    printf '\n\n%s' 'Write new Django project name: '
             read var_project_name
             if [ "$var_project_name" = "" ] ; then
@@ -98,6 +91,22 @@ function what_to_do() {
 	project_path
         cd $var_project_path
         django-admin startproject $var_project_name	
+        choose_db
+        if [ "$var_db" = "1" ] ; then
+            printf '\n\e[1;33m%-6s\e[m\n' 'Configuring Django to use MySQL...'
+	    sed -i -- 's/django.db.backends.sqlite3/django.db.backends.mysql/g' \
+	        $var_project_path/$var_project_name/$var_project_name/settings.py
+            sed -i -- "s/os.path.join(BASE_DIR, 'db.sqlite3'),/'django',\n        'USER': 'django', \
+                \n        'PASSWORD': 'django',\n        'HOST': 'localhost', \
+		\n        'PORT': '3306',/g" \
+		$var_project_path/$var_project_name/$var_project_name/settings.py
+
+
+
+
+
+
+	fi
 
 
 
