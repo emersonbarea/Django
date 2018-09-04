@@ -17,7 +17,6 @@ function what_to_do() {
             sudo apt install mysql-server-5.7 python-mysqldb -y
 	    echo "mysql-server-5.7 mysql-server/root_password password root" | sudo debconf-set-selections
             echo "mysql-server-5.7 mysql-server/root_password_again password root" | sudo debconf-set-selections
-            #DEBIAN_FRONTEND=noninteractive sudo apt install mysql-server-5.7 -y
             sudo mysql -e "FLUSH PRIVILEGES;"
 	}	
 
@@ -37,7 +36,7 @@ function what_to_do() {
 
         printf '\n\e[1;32m%-6s\n\n%s\n%s\n%s\n%s\n\n%s\n\n\e[m' \
 	       'The following programs have been installed:' '    - Django 1.11' '    - Nginx 1.14' '    - SQLite3' \
-	       '    - MySQL Server 5.7' 'MySQL root password = "root"'
+	       '    - MySQL Server 5.7' 'MySQL root password = "root" (sudo mysql -u root -p)'
     }
 
     function create_project() {
@@ -99,13 +98,16 @@ function what_to_do() {
 	printf '\n\e[1;33m%-6s\e[m\n' 'Configuring Django...'
         sed -i -- 's/UTC/America\/Sao_Paulo/g' \
 	    $var_project_path/$var_project_name/$var_project_name/settings.py
-        sed -i -- "s/ALLOWED_HOSTS = \[\]/ALLOWED_HOSTS = \['localhost'\]/g" \
-            $var_project_path/$var_project_name/$var_project_name/settings.py
-        sed -i -- "s/STATIC_URL = '\/static\/'/STATIC_ROOT = os.path.join(BASE_DIR, 'static\/')/g" \
+	
+	ip_addresses=`hostname --all-ip-addresses || hostname -I`
+	ip_addresses_edited=`echo $ip_addresses | sed "s/ /', '/g"`
+	sed -i -- "s/ALLOWED_HOSTS = \[\]/ALLOWED_HOSTS = [ '$ip_addresses_edited' ]/g" \
+             $var_project_path/$var_project_name/$var_project_name/settings.py	
+
+	printf "STATIC_ROOT = os.path.join(BASE_DIR, 'static/')\n" >> \
             $var_project_path/$var_project_name/$var_project_name/settings.py        
         
 	if [ "$var_db" = "1" ] ; then
-            printf '\n\e[1;33m%-6s\e[m\n' 'Configuring MySQL...'
 	    configure_MySQL
 	    sed -i -- 's/django.db.backends.sqlite3/django.db.backends.mysql/g' \
 	        $var_project_path/$var_project_name/$var_project_name/settings.py
@@ -114,21 +116,29 @@ function what_to_do() {
 		\n        'PORT': '3306',/g" \
 		$var_project_path/$var_project_name/$var_project_name/settings.py
 	fi
-        
+       
+        printf '\n\e[1;33m%-6s\e[m\n' 'Populating Database...'
+	$var_project_path/$var_project_name/manage.py makemigrations
+	$var_project_path/$var_project_name/manage.py migrate
+	$var_project_path/$var_project_name/manage.py collectstatic
+        printf "from django.contrib.auth.models import User; \
+		User.objects.create_superuser('admin', 'admin@$var_project_name.com', 'admin')" | \
+		$var_project_path/$var_project_name/manage.py shell
+
 	printf '\n\e[1;32m%-6s\n%s%s\n%s%s\n\e[m' \
                'The following project was created:' '    - Project name: ' $var_project_name \
 	       '    - Project path: ' $var_project_path/$var_project_name
         if [ "$var_db" = "1" ] ; then
             printf '\e[1;32m%-6s\n%s%s\n%s%s%s%s\n\e[m' '    - Database: MySQL Server 5.7' '    - Database name: ' $var_project_name \
-	           '    - Database (user - passwd): ' $var_project_name - $var_project_name	    
+	           '    - Database (user - passwd): ' $var_project_name ' - ' $var_project_name	    
         else
 	    printf '\e[1;32m%-6s\n%s%s%s\n\e[m' '    - Database: SQLite3' '    - Database path: ' \
 		   $var_project_path/$var_project_name '/db.sqlite3'
         fi		
+	printf '\e[1;32m%-6s%s\n%s%s\n\e[m' '    - Project admin credentials (user - passwd): admin - ' $var_project_name \
+	       '    - URL: http://<ip_address>:8000/admin e http://<ip_address>:8000/' $var_project_name
         printf '\n\e[1;32m%-6s%s%s\n\n\e[m' 'Look in the ' $var_project_path/$var_project_name/$var_project_name/settings.py \
 	       ' file to see all project configurations'
-
-
     }
 
     function create_application() {
@@ -162,18 +172,6 @@ function what_to_do() {
 welcome;
 what_to_do;
 
-
-#Do you want install Django? (This option will also install Nginx and MySQL Server)
-# - vai usar o MySQL ou SQLite3?
-# - informar que será criado um projeto chamado teste
-#       - com uma aplicação chamada teste
-# - informar que o cara pode acessar essa aplicação na URL XPTO
-# - e onde estão os arquivos....
-
-#Create a new project? (Qual o nome do projeto? Qual caminho?)
-# - informar onde estão os arquivos 
-# - informar como acessar a URL
-# - informar que não aplicação criada neste projeto ainda
 
 #Create new application? (Qual o nome da aplicação? Em qual projeto? Qual caminho?
 # - informar onde estão os arquivos
