@@ -14,14 +14,10 @@ function what_to_do() {
 
         function install_MySQL() {
             printf '\n\e[1;33m%-6s\e[m\n' 'Installing MySQL Server 5.7...'
-            #sudo apt install mysql-server-5.7 python-mysqldb -y
-            echo "mysql-server-5.7 mysql-server/root_password password root" | sudo debconf-set-selections
+            sudo apt install mysql-server-5.7 python-mysqldb -y
+	    echo "mysql-server-5.7 mysql-server/root_password password root" | sudo debconf-set-selections
             echo "mysql-server-5.7 mysql-server/root_password_again password root" | sudo debconf-set-selections
-            DEBIAN_FRONTEND=noninteractive sudo apt install mysql-server-5.7 -y
-            #printf '\n\e[1;33m%-6s\e[m\n' 'Creating MySQL database "django" and user "django"'
-            #sudo mysql -e "CREATE DATABASE django /*\!40100 DEFAULT CHARACTER SET utf8 */;"
-            #sudo mysql -e "CREATE USER django@localhost IDENTIFIED BY 'django';"
-            #sudo mysql -e "GRANT ALL PRIVILEGES ON django.* TO 'django'@'localhost';"
+            #DEBIAN_FRONTEND=noninteractive sudo apt install mysql-server-5.7 -y
             sudo mysql -e "FLUSH PRIVILEGES;"
 	}	
 
@@ -39,10 +35,9 @@ function what_to_do() {
 	sudo apt install nginx gunicorn3 -y
         install_MySQL
 
-        printf '\n\e[1;32m%-6s\n\n%s\n%s\n%s\n%s\n\n%s\n%s\n%s\n%s\n%s\n%s\n\n\e[m' \
+        printf '\n\e[1;32m%-6s\n\n%s\n%s\n%s\n%s\n\n%s\n\n\e[m' \
 	       'The following programs have been installed:' '    - Django 1.11' '    - Nginx 1.14' '    - SQLite3' \
-	       '    - MySQL Server 5.7' 'MySQL root password = "root"' 'MySQL Django credentials: ' 'username = django' \
-	       'password = django' 'database = django' 'hostname = localhost'
+	       '    - MySQL Server 5.7' 'MySQL root password = "root"'
     }
 
     function create_project() {
