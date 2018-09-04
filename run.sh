@@ -14,14 +14,14 @@ function what_to_do() {
 
         function install_MySQL() {
             printf '\n\e[1;33m%-6s\e[m\n' 'Installing MySQL Server 5.7...'
-            sudo apt install mysql-server-5.7 python-mysqldb -y
+            #sudo apt install mysql-server-5.7 python-mysqldb -y
             echo "mysql-server-5.7 mysql-server/root_password password root" | sudo debconf-set-selections
             echo "mysql-server-5.7 mysql-server/root_password_again password root" | sudo debconf-set-selections
             DEBIAN_FRONTEND=noninteractive sudo apt install mysql-server-5.7 -y
-            printf '\n\e[1;33m%-6s\e[m\n' 'Creating MySQL database "django" and user "django"'
-            sudo mysql -e "CREATE DATABASE django /*\!40100 DEFAULT CHARACTER SET utf8 */;"
-            sudo mysql -e "CREATE USER django@localhost IDENTIFIED BY 'django';"
-            sudo mysql -e "GRANT ALL PRIVILEGES ON django.* TO 'django'@'localhost';"
+            #printf '\n\e[1;33m%-6s\e[m\n' 'Creating MySQL database "django" and user "django"'
+            #sudo mysql -e "CREATE DATABASE django /*\!40100 DEFAULT CHARACTER SET utf8 */;"
+            #sudo mysql -e "CREATE USER django@localhost IDENTIFIED BY 'django';"
+            #sudo mysql -e "GRANT ALL PRIVILEGES ON django.* TO 'django'@'localhost';"
             sudo mysql -e "FLUSH PRIVILEGES;"
 	}	
 
@@ -39,24 +39,13 @@ function what_to_do() {
 	sudo apt install nginx gunicorn3 -y
         install_MySQL
 
-        printf '\n\e[1;33m%-6s\n\n%s\n%s\n%s\n%s\n\n%s\n%s\n%s\n%s\n%s\n%s\n\n\e[m' \
-	       'Following programs have been installed:' '    - Django 1.11' '    - Nginx 1.14' '    - SQLite3' \
+        printf '\n\e[1;32m%-6s\n\n%s\n%s\n%s\n%s\n\n%s\n%s\n%s\n%s\n%s\n%s\n\n\e[m' \
+	       'The following programs have been installed:' '    - Django 1.11' '    - Nginx 1.14' '    - SQLite3' \
 	       '    - MySQL Server 5.7' 'MySQL root password = "root"' 'MySQL Django credentials: ' 'username = django' \
 	       'password = django' 'database = django' 'hostname = localhost'
     }
 
     function create_project() {
-
-        function choose_db() {
-            printf '\n\n%s\n%s\n%s\n\n%s' \
-                   'Choose the database type you want to use:' \
-                   '    - [1] MySQL Server' '    - [2] SQLite3' 'Note: choose the corresponding number: '
-            read var_db
-            if [ "$var_db" != "1" ] && [ "$var_db" != "2" ]; then
-                printf '\e[1;31m%-6s\e[m' 'error: Choose only options 1 or 2 !!!'
-                choose_db
-            fi
-        }
 
         function project_name() {
 	    printf '\n\n%s' 'Write new Django project name: '
@@ -85,31 +74,64 @@ function what_to_do() {
 	    fi
 	}
 
+        function choose_db() {
+            printf '\n%s\n%s\n%s\n\n%s' \
+                   'Choose the database type you want to use:' \
+                   '    - [1] MySQL Server' '    - [2] SQLite3' 'Note: choose the corresponding number: '
+            read var_db
+            if [ "$var_db" != "1" ] && [ "$var_db" != "2" ]; then
+                printf '\e[1;31m%-6s\e[m' 'error: Choose only options 1 or 2 !!!'
+                choose_db
+            fi
+        }
+
+	function configure_MySQL() {
+            printf '\n\e[1;33m%-6s\e[m\n' 'Configuring MySQL Database...'
+            sudo mysql -e "CREATE DATABASE $var_project_name /*\!40100 DEFAULT CHARACTER SET utf8 */;"
+            sudo mysql -e "CREATE USER $var_project_name@localhost IDENTIFIED BY '$var_project_name';"
+            sudo mysql -e "GRANT ALL PRIVILEGES ON $var_project_name.* TO '$var_project_name'@'localhost';"
+            sudo mysql -e "FLUSH PRIVILEGES;"
+	}
+
 	# configuration...
         printf '\n\e[1;33m%-6s\e[m' 'You chose to create a new Django projects.'
         project_name 
 	project_path
+	choose_db
         cd $var_project_path
         django-admin startproject $var_project_name	
-        choose_db
-        if [ "$var_db" = "1" ] ; then
-            printf '\n\e[1;33m%-6s\e[m\n' 'Configuring Django to use MySQL...'
+        
+	printf '\n\e[1;33m%-6s\e[m\n' 'Configuring Django...'
+        sed -i -- 's/UTC/America\/Sao_Paulo/g' \
+	    $var_project_path/$var_project_name/$var_project_name/settings.py
+        sed -i -- "s/ALLOWED_HOSTS = \[\]/ALLOWED_HOSTS = \['localhost'\]/g" \
+            $var_project_path/$var_project_name/$var_project_name/settings.py
+        sed -i -- "s/STATIC_URL = '\/static\/'/STATIC_ROOT = os.path.join(BASE_DIR, 'static\/')/g" \
+            $var_project_path/$var_project_name/$var_project_name/settings.py        
+        
+	if [ "$var_db" = "1" ] ; then
+            printf '\n\e[1;33m%-6s\e[m\n' 'Configuring MySQL...'
+	    configure_MySQL
 	    sed -i -- 's/django.db.backends.sqlite3/django.db.backends.mysql/g' \
 	        $var_project_path/$var_project_name/$var_project_name/settings.py
-            sed -i -- "s/os.path.join(BASE_DIR, 'db.sqlite3'),/'django',\n        'USER': 'django', \
-                \n        'PASSWORD': 'django',\n        'HOST': 'localhost', \
+            sed -i -- "s/os.path.join(BASE_DIR, 'db.sqlite3'),/'$var_project_name',\n        'USER': '$var_project_name', \
+                \n        'PASSWORD': '$var_project_name',\n        'HOST': 'localhost', \
 		\n        'PORT': '3306',/g" \
 		$var_project_path/$var_project_name/$var_project_name/settings.py
-
-
-
-
-
-
 	fi
-
-
-
+        
+	printf '\n\e[1;32m%-6s\n%s%s\n%s%s\n\e[m' \
+               'The following project was created:' '    - Project name: ' $var_project_name \
+	       '    - Project path: ' $var_project_path/$var_project_name
+        if [ "$var_db" = "1" ] ; then
+            printf '\e[1;32m%-6s\n%s%s\n%s%s%s%s\n\e[m' '    - Database: MySQL Server 5.7' '    - Database name: ' $var_project_name \
+	           '    - Database (user - passwd): ' $var_project_name - $var_project_name	    
+        else
+	    printf '\e[1;32m%-6s\n%s%s%s\n\e[m' '    - Database: SQLite3' '    - Database path: ' \
+		   $var_project_path/$var_project_name '/db.sqlite3'
+        fi		
+        printf '\n\e[1;32m%-6s%s%s\n\n\e[m' 'Look in the ' $var_project_path/$var_project_name/$var_project_name/settings.py \
+	       ' file to see all project configurations'
 
 
     }
