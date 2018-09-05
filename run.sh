@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# This script guides you through the installation of Django 1.11, Nginx 1.14 and MySQL Server 5.7.
+# This script guides you through the installation of Django 1.11, Nginx 1.14, Gunicorn 19.7 and MySQL Server 5.7.
 # It also assists you in creating new projects or new applications in an existing project.
 
 function welcome() {
-    printf '\n%s\n%s' 'This script guides you through the installation of Django 1.11, Nginx 1.14 and MySQL Server 5.7.' \
+    printf '\n%s\n%s' 'This script guides you through the installation of Django 1.11, Nginx 1.14, Gunicorn 19.7 and MySQL Server 5.7.' \
                       'It also assists you in creating new projects or new applications in an existing project.'
 }
 
@@ -21,7 +21,7 @@ function what_to_do() {
 	}	
 
 	# installation...
-	printf '\n\e[1;33m%-6s\e[m' 'You chose to install Django.'
+	printf '\n\e[1;33m%-6s\e[m\n' 'You chose to install Django.'
 	printf '\n\e[1;33m%-6s\e[m\n' 'Installing prerequisites...'
 	sudo apt update
         sudo apt install language-pack-pt -y
@@ -30,13 +30,13 @@ function what_to_do() {
 	sudo snap install pycharm-community --classic
         printf '\n\e[1;33m%-6s\e[m\n' 'Installing Django 1.11...'
 	sudo -H pip install Django==1.11
-	printf '\n\e[1;33m%-6s\e[m\n' 'Installing Nginx 1.4 e o Gunicorn3...'
-	sudo apt install nginx gunicorn3 -y
+	printf '\n\e[1;33m%-6s\e[m\n' 'Installing Nginx 1.4 e o Gunicorn 19.7...'
+	sudo apt install nginx gunicorn -y
         install_MySQL
 
-        printf '\n\e[1;32m%-6s\n\n%s\n%s\n%s\n%s\n\n%s\n\n\e[m' \
-	       'The following programs have been installed:' '    - Django 1.11' '    - Nginx 1.14' '    - SQLite3' \
-	       '    - MySQL Server 5.7' 'MySQL root password = "root" (sudo mysql -u root -p)'
+        printf '\n\e[1;32m%-6s\n\n%s\n%s\n%s\n%s\n%s\n\n%s\n\n\e[m' \
+	       'The following programs have been installed:' '    - Django 1.11' '    - Nginx 1.14' '    - Gunicorn 19.7' \
+	       '    - SQLite3' '    - MySQL Server 5.7' 'MySQL root password = "root" (sudo mysql -u root -p)'
     }
 
     function create_project() {
@@ -118,12 +118,27 @@ function what_to_do() {
 	fi
        
         printf '\n\e[1;33m%-6s\e[m\n' 'Populating Database...'
+
 	$var_project_path/$var_project_name/manage.py makemigrations
 	$var_project_path/$var_project_name/manage.py migrate
 	$var_project_path/$var_project_name/manage.py collectstatic
-        printf "from django.contrib.auth.models import User; \
+
+	printf "from django.contrib.auth.models import User; \
 		User.objects.create_superuser('admin', 'admin@$var_project_name.com', 'admin')" | \
 		$var_project_path/$var_project_name/manage.py shell
+
+	who_service=`whoami`
+	printf '%s\n%s\n%s\n\n%s\n%s%s\n%s\n%s%s\n%s%s%s%s%s\n\n%s\n%s\n' \
+	       '[Unit]' 'Description=gunicorn daemon' 'After=network.target' '[Service]' \
+	       'User=' $who_service 'Group=www-data' 'WorkingDirectory=' $var_project_path/$var_project_name \
+	       'ExecStart=/usr/bin/gunicorn --access-logfile - --workers 3 --bind unix:' \
+	       $var_project_path/$var_project_name/$var_project_name '.sock ' $var_project_name \
+	       '.wsgi:application' '[Install]' 'WantedBy=multi-user.target' | sudo tee /etc/systemd/system/gunicorn.service
+	sudo systemctl start gunicorn
+	sudo systemctl enable gunicorn
+
+
+
 
 	printf '\n\e[1;32m%-6s\n%s%s\n%s%s\n\e[m' \
                'The following project was created:' '    - Project name: ' $var_project_name \
@@ -135,7 +150,7 @@ function what_to_do() {
 	    printf '\e[1;32m%-6s\n%s%s%s\n\e[m' '    - Database: SQLite3' '    - Database path: ' \
 		   $var_project_path/$var_project_name '/db.sqlite3'
         fi		
-	printf '\e[1;32m%-6s%s\n%s%s\n\e[m' '    - Project admin credentials (user - passwd): admin - ' $var_project_name \
+	printf '\e[1;32m%-6s\n%s%s%s\n\e[m' '    - Project admin credentials (user - passwd): admin - admin ' \
 	       '    - URL: http://<ip_address>:8000/admin e http://<ip_address>:8000/' $var_project_name
         printf '\n\e[1;32m%-6s%s%s\n\n\e[m' 'Look in the ' $var_project_path/$var_project_name/$var_project_name/settings.py \
 	       ' file to see all project configurations'
