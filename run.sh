@@ -52,7 +52,8 @@ function what_to_do() {
         fi
         if [ "$var_cleaning" = "" ] || [ "$var_cleaning" = "Y" ] || [ "$var_cleaning" = "y" ] ; then
             printf '\e[1;33m%-6s\e[m\n' 'Cleaning MySQL Database...'
-	    for i in $(sudo mysql -e "show databases" | grep -v Database | grep -v mysql | grep -v information_schema); do
+	    for i in $(sudo mysql -e "show databases" | grep -v Database | grep -v mysql | \
+		grep -v information_schema | grep -v performance_schema | grep -v sys); do
 	        sudo mysql -e "drop database $i;"
 		sudo mysql -e "drop user $i@localhost;"
 	    done
