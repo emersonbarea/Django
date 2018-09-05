@@ -42,42 +42,38 @@ function what_to_do() {
 	       '    - SQLite3' '    - MySQL Server 5.7' 'MySQL root password = "root" (sudo mysql -u root -p)'
     }
 
+    function cleaning() {
+        printf '\n\n%s' 'Do you want to erase all previous configuration and projects? ([y],n): '
+	read var_cleaning
+        if [ "$var_cleaning" != "" ] && [ "$var_cleaning" != "Y" ] && [ "$var_cleaning" != "y" ] \
+        && [ "$var_cleaning" != "N" ] && [ "$var_cleaning" != "n" ]; then
+            printf '\e[1;31m%-6s\e[m' 'error: Press only Y|y or N|n'
+            cleaning;
+        fi
+        if [ "$var_cleaning" = "" ] || [ "$var_cleaning" = "Y" ] || [ "$var_cleaning" = "y" ] ; then
+            printf '\e[1;33m%-6s\e[m\n' 'Cleaning MySQL Database...'
+	    sudo rm -R /var/lib/mysql/* 2> /dev/null
+	    sudo mysqld --initialize --explicit_defaults_for_timestamp	
+	    printf '\e[1;33m%-6s\e[m\n' 'Cleaning Nginx Configuration...'
+	    sudo find /etc/nginx/sites-available/ -type f ! -name 'default' -delete
+	    sudo find /etc/nginx/sites-enabled/ -type f ! -name 'default' -delete
+	    sudo systemctl restart nginx
+	    printf '\e[1;33m%-6s\e[m\n' 'Erasing all previous projects...'
+	    sudo rm -rf $BUILD_DIR/projects/*
+	    printf '\e[1;33m%-6s\e[m\n' 'Erasing Gunicor startup configuration...'
+	    sudo systemctl stop gunicorn 2> /dev/null
+	    sudo systemctl disable gunicorn 2> /dev/null
+	    sudo rm /etc/systemd/system/gunicorn.service 2> /dev/null
+	    sudo systemctl daemon-reload
+	else
+	    echo "apagou apenas o sites-enabled"
+	fi
+    }
+
     function create_project() {
 
-	function cleaning() {
-            printf '\n\n%s' \
-	           'Do you want to erase all previous configuration and projects? ([y],n): '
-	    read var_cleaning
-            if [ "$var_cleaning" != "" ] && [ "$var_cleaning" != "Y" ] && [ "$var_cleaning" != "y" ] \
-            && [ "$var_cleaning" != "N" ] && [ "$var_cleaning" != "n" ]; then
-                printf '\e[1;31m%-6s\e[m' 'error: Press only Y|y or N|n'
-                cleaning;
-            fi
-            if [ "$var_cleaning" = "" ] || [ "$var_cleaning" = "Y" ] || [ "$var_cleaning" = "y" ] ; then
-                printf '\e[1;33m%-6s\e[m\n' 'Cleaning MySQL Database...'
-		sudo rm -R /var/lib/mysql/* 2> /dev/null
-		sudo mysqld --initialize --explicit_defaults_for_timestamp	
-		printf '\e[1;33m%-6s\e[m\n' 'Cleaning Nginx Configuration...'
-		sudo rm /etc/nginx/sites-available/* 2> /dev/null
-		sudo rm /etc/nginx/sites-enabled/* 2> /dev/null
-		sudo systemctl restart nginx
-		printf '\e[1;33m%-6s\e[m' 'oi'
-
-
-	    else
-		echo "apagou apenas o sites-enabled"
-	    fi
-
-
-
-
-
-
-
-	}
-
         function project_name() {
-	    printf '\n\n%s' 'Write new Django project name: '
+	    printf '\n%s' 'Write new Django project name: '
             read var_project_name
             if [ "$var_project_name" = "" ] ; then
                 printf '\e[1;31m%-6s\e[m' 'error: Write new Django project name'
@@ -116,54 +112,52 @@ function what_to_do() {
         
 	printf '\n\e[1;33m%-6s\e[m\n' 'Configuring Django settings.py...'
         sed -i -- 's/UTC/America\/Sao_Paulo/g' \
-	    $BUILD_DIR/$var_project_name/$var_project_name/settings.py
+	    $BUILD_DIR/projects/$var_project_name/$var_project_name/settings.py
 	
 	ip_addresses=`hostname --all-ip-addresses || hostname -I`
 	ip_addresses_edited=`echo $ip_addresses | sed "s/ /', '/g"`
 	sed -i -- "s/ALLOWED_HOSTS = \[\]/ALLOWED_HOSTS = [ '$ip_addresses_edited' ]/g" \
-             $BUILD_DIR/$var_project_name/$var_project_name/settings.py	
+             $BUILD_DIR/projects/$var_project_name/$var_project_name/settings.py	
 
 	printf "STATIC_ROOT = os.path.join(BASE_DIR, 'static/')\n" >> \
-            $BUILD_DIR/$var_project_name/$var_project_name/settings.py        
+            $BUILD_DIR/projects/$var_project_name/$var_project_name/settings.py        
         
 	if [ "$var_db" = "1" ] ; then
 	    sed -i -- 's/django.db.backends.sqlite3/django.db.backends.mysql/g' \
-	        $BUILD_DIR/$var_project_name/$var_project_name/settings.py
+	        $BUILD_DIR/projects/$var_project_name/$var_project_name/settings.py
             sed -i -- "s/os.path.join(BASE_DIR, 'db.sqlite3'),/'$var_project_name',\n        'USER': '$var_project_name', \
                 \n        'PASSWORD': '$var_project_name',\n        'HOST': 'localhost', \
 		\n        'PORT': '3306',/g" \
-		$BUILD_DIR/$var_project_name/$var_project_name/settings.py
+		$BUILD_DIR/projects/$var_project_name/$var_project_name/settings.py
             configure_MySQL	    
 	fi
        
         printf '\n\e[1;33m%-6s\e[m\n' 'Populating Database...'
-	$BUILD_DIR/$var_project_name/manage.py makemigrations
-	$BUILD_DIR/$var_project_name/manage.py migrate
+	$BUILD_DIR/projects/$var_project_name/manage.py makemigrations
+	$BUILD_DIR/projects/$var_project_name/manage.py migrate
 	printf "from django.contrib.auth.models import User; \
                 User.objects.create_superuser('admin', 'admin@$var_project_name.com', 'admin')" | \
-                $BUILD_DIR/$var_project_name/manage.py shell
+                $BUILD_DIR/projects/$var_project_name/manage.py shell
 
 	printf '\n\e[1;33m%-6s\e[m\n' 'Creating static web files...'	
-	$BUILD_DIR/$var_project_name/manage.py collectstatic
+	$BUILD_DIR/projects/$var_project_name/manage.py collectstatic
 
 	printf '\n\e[1;33m%-6s\e[m\n' 'Configuring Gunicorn...'
 	who_service=`whoami`
 	printf '%s\n%s\n%s\n\n%s\n%s%s\n%s\n%s%s\n%s%s%s%s%s\n\n%s\n%s\n' \
 	       '[Unit]' 'Description=gunicorn daemon' 'After=network.target' '[Service]' \
-	       'User=' $who_service 'Group=www-data' 'WorkingDirectory=' $BUILD_DIR/$var_project_name \
+	       'User=' $who_service 'Group=www-data' 'WorkingDirectory=' $BUILD_DIR/projects/$var_project_name \
 	       'ExecStart=/usr/bin/gunicorn --access-logfile - --workers 3 --bind unix:' \
-	       $BUILD_DIR/$var_project_name/$var_project_name '.sock ' $var_project_name \
+	       $BUILD_DIR/projects/$var_project_name/$var_project_name '.sock ' $var_project_name \
 	       '.wsgi:application' '[Install]' 'WantedBy=multi-user.target' | sudo tee /etc/systemd/system/gunicorn.service
 
         printf '\n\e[1;33m%-6s\e[m\n' 'Configuring Nginx...'
-#        sudo rm /etc/nginx/sites-available/*
-#        sudo rm /etc/nginx/sites-enabled/*
         printf '%s\n%s\n%s%s%s\n\n%s\n%s\n%s%s%s\n%s\n\n%s\n%s\n%s%s%s\n%s\n%s\n' \
                'server {' '    listen 80;' '    server_name ' "$ip_addresses" ';' \
                '    location = /favicon.ico { access_log off; log_not_found off; }' \
-               '    location /static/ {' '        root ' $BUILD_DIR/$var_project_name ';' \
+               '    location /static/ {' '        root ' $BUILD_DIR/projects/$var_project_name ';' \
                '    }' '    location / {' '        include proxy_params;' \
-               '        proxy_pass http://unix:' $BUILD_DIR/$var_project_name/$var_project_name '.sock;' \
+               '        proxy_pass http://unix:' $BUILD_DIR/projects/$var_project_name/$var_project_name '.sock;' \
                '    }' '}' | sudo tee /etc/nginx/sites-available/$var_project_name	
 	sudo ln -s /etc/nginx/sites-available/$var_project_name /etc/nginx/sites-enabled
 	sudo nginx -t
@@ -176,17 +170,17 @@ function what_to_do() {
 
 	printf '\n\e[1;32m%-6s\n%s%s\n%s%s\n\e[m' \
                'The following project was created:' '    - Project name: ' $var_project_name \
-	       '    - Project path: ' $BUILD_DIR/$var_project_name
+	       '    - Project path: ' $BUILD_DIR/projects/$var_project_name
         if [ "$var_db" = "1" ] ; then
             printf '\e[1;32m%-6s\n%s%s\n%s%s%s%s\n\e[m' '    - Database: MySQL Server 5.7' '    - Database name: ' $var_project_name \
 	           '    - Database (user - passwd): ' $var_project_name ' - ' $var_project_name	    
         else
 	    printf '\e[1;32m%-6s\n%s%s%s\n\e[m' '    - Database: SQLite3' '    - Database path: ' \
-		   $BUILD_DIR/$var_project_name '/db.sqlite3'
+		   $BUILD_DIR/projects/$var_project_name '/db.sqlite3'
         fi		
 	printf '\e[1;32m%-6s\n%s%s%s\n\e[m' '    - Project admin credentials (user - passwd): admin - admin ' \
 	       '    - URL: http://<ip_address> e http://<ip_address>/admin'
-        printf '\n\e[1;32m%-6s%s%s\n\n\e[m' 'Look in the ' $BUILD_DIR/$var_project_name/$var_project_name/settings.py \
+        printf '\n\e[1;32m%-6s%s%s\n\n\e[m' 'Look in the ' $BUILD_DIR/projects/$var_project_name/$var_project_name/settings.py \
 	       ' file to see all project configurations'
     }
 
