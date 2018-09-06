@@ -137,8 +137,8 @@ function what_to_do() {
             configure_MySQL	    
 	fi
 
-        #sed -i -- "s/DEBUG = True/DEBUG = False/g" \
-        #     $BUILD_DIR/projects/$var_project_name/$var_project_name/settings.py
+        sed -i -- "s/DEBUG = True/DEBUG = False/g" \
+             $BUILD_DIR/projects/$var_project_name/$var_project_name/settings.py
 
         printf '\n\e[1;33m%-6s\e[m\n' 'Populating Database...'
 	$BUILD_DIR/projects/$var_project_name/manage.py makemigrations
@@ -193,7 +193,74 @@ function what_to_do() {
     }
 
     function create_application() {
-        printf 'create_application'
+
+	function choose_project_name() {
+            printf '\n\e[1;33m%-6s\e[m\n' 'You chose to create an application in an existent project.'
+            printf '\n%s\n' 'Choose in which project the new application will be created:'
+            cont=1
+            for i in $(ls $BUILD_DIR/projects); do
+                printf '%s%s%s%s\n' '    - [' $cont '] ' $i;
+		array_project[$cont]=$i
+                cont=$(($cont+1));
+            done
+	    cont=$((cont-1))
+	    printf '%s' 'Note: choose the corresponding number: '
+	    read var_project_idx
+            re='^[0-9]+$'
+            if ! [[ $var_project_idx =~ $re ]] ||  [ $var_project_idx -lt 1 ] || [ $var_project_idx -gt $cont ] ; then
+                printf '\e[1;31m%-6s\e[m' 'error: Write only the corresponding number'
+	        choose_project_name
+            fi
+        }
+
+	function choose_app_name() {
+	    printf '\n%s' 'Write the application name: '
+	    read var_app_name
+	    if [[ -z "${var_app_name// }" ]] ; then
+		printf '\n\e[1;31m%-6s\e[m\n\n' 'error: Write a valid name containing letters and numbers'
+                choose_app_name
+	    fi
+        }
+
+        choose_project_name
+	choose_app_name
+	
+	printf '\n\e[1;33m%-6s%s%s\n\e[m' 'Creating application...'
+	cd $BUILD_DIR/projects/${array_project[$var_project_idx]}
+	python manage.py startapp $var_app_name
+
+	# configuring views.py
+        printf '\n\e[1;33m%-6s%s%s\n\e[m' 'Configuring the views.py application example...'
+        printf '%s\n\n%s\n%s\n' 'from django.http import HttpResponse' 'def index(request):' \
+               '    return HttpResponse("Hello, world. You are at the polls index.")' | \
+	       tee $BUILD_DIR/projects/${array_project[$var_project_idx]}/$var_app_name/views.py
+
+	# mapping views.py in applicaton urls.py
+	printf '\n\e[1;33m%-6s%s%s\n\e[m' 'Mapping views.py application example in application urls.py...'
+	printf '%s\n\n%s\n\n%s\n%s\n%s\n' 'from django.conf.urls import url' 'from . import views' \
+	       'urlpatterns = [' "    url(r'^$', views.index, name='index')," ']' | \
+	       tee $BUILD_DIR/projects/${array_project[$var_project_idx]}/$var_app_name/urls.py
+
+	# mapping application urls.py in main project urls.py
+	printf '\n\e[1;33m%-6s%s%s\n\e[m' 'Mapping application urls.py in main project urls.py...'
+	
+	compare="from django.conf.urls import include"
+	if [[ $(head -1 $BUILD_DIR/projects/${array_project[$var_project_idx]}/${array_project[$var_project_idx]}/urls.py) != $compare ]] ; then
+            sed -i '1 i\from django.conf.urls import include' \
+                   $BUILD_DIR/projects/${array_project[$var_project_idx]}/${array_project[$var_project_idx]}/urls.py
+	fi
+	
+	sed -i '$ d' $BUILD_DIR/projects/${array_project[$var_project_idx]}/${array_project[$var_project_idx]}/urls.py
+	printf '%s\n%s\n' "    url(r'^$var_app_name/', include('$var_app_name.urls')),"	']' | \
+	       tee --append $BUILD_DIR/projects/${array_project[$var_project_idx]}/${array_project[$var_project_idx]}/urls.py
+	sudo systemctl restart gunicorn
+        sudo systemctl restart nginx
+
+	printf '\n\e[1;32m%-6s\n%s%s\n%s%s\n%s%s\n%s%s\n\n\e[m' 'The following application was created:' \
+	       '    - Project: ' ${array_project[$var_project_idx]} \
+	       '    - Application: ' $var_app_name \
+	       '    - Application folder: ' $BUILD_DIR/projects/${array_project[$var_project_idx]}/$var_app_name \
+	       '    - URL: http://<ip_address>/' $var_app_name
     }
 
     # install_django: install Django 1.11, Nginx 1.4 and ask if you want to use SQLite3 ou MySQL.
@@ -201,10 +268,11 @@ function what_to_do() {
     # create_project: prompts for the name of the project and the path where it will be created.
     # create_application: prompts for the name of the application, the name of the project it belongs to,
     #     and what path it will be created.
-    printf '\n\n%s\n%s\n%s\n%s\n%s\n\n%s' \
+    printf '\n\n%s\n%s\n%s\n%s\n%s\n%s\n\n%s' \
 	   'Choose what do you want to do:' '    - [1] Install Django' '    - [2] Create new Django Project' \
 	   '    - [3] Create new Application in an existing Django Project' \
-	   '    - [4] Clear all projects and restore default configuration'   'Note: choose the corresponding number: '
+	   '    - [4] Clear all projects and restore default configuration' '    - [5] Exit' \
+	   'Note: choose the corresponding number: '
     read var_what_to_do
 
     if [ "$var_what_to_do" = "1" ] ; then
@@ -215,24 +283,19 @@ function what_to_do() {
         create_application
     elif [ "$var_what_to_do" = "4" ] ; then
 	cleaning
+    elif [ "$var_what_to_do" = "5" ] ; then
+	exit
     else
         printf '\e[1;31m%-6s\e[m' 'error: Choose only options 1, 2 or 3 !!!'
         what_to_do	
     fi
+
+    main
 }
 
-# main
+main() {
+    welcome;
+    what_to_do;
+}
 
-welcome;
-what_to_do;
-
-
-#Create new application? (Qual o nome da aplicação? Em qual projeto? Qual caminho?
-# - informar onde estão os arquivos
-# - informar como acessar URL
-
-
-# COLOCANDO EM PRODUCAO
-#settings.py
-#	DEBUG = False
-
+main
