@@ -29,8 +29,9 @@ function what_to_do() {
 	sudo apt update
         sudo apt install language-pack-pt -y
         sudo apt upgrade -y
-        sudo apt install git vim htop ethtool python-pip python3-pip snapd snapd-xdg-open -y
+        sudo apt install git vim htop ethtool python-pip python3-pip snapd snapd-xdg-open libxrender1 libxtst6 libxi6 -y
 	sudo snap install pycharm-community --classic
+	sudo ln -s /snap/pycharm-community/current/bin/pycharm.sh /bin/pycharm
         printf '\n\e[1;33m%-6s\e[m\n' 'Installing Django 1.11...'
 	sudo -H pip install Django==1.11
 	printf '\n\e[1;33m%-6s\e[m\n' 'Installing Nginx 1.4 e o Gunicorn 19.7...'
