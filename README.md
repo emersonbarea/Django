@@ -20,3 +20,30 @@ This script also automates the following tasks:
 Note: this script does not do web server and BD hardening yet.
 
 Note: it does not use virtualenv
+
+You need a basic and fresh Ubuntu 18.04.1 Server LTS (Bionic Beaver) installation.
+
+```
+git clone https://github.com/emersonbarea/Django.git
+
+cd Django
+
+./run.sh
+```
+
+This will show you a wizard menu:
+
+```
+This script guides you through the installation of Django 1.11, Nginx 1.14, Gunicorn 19.7 and MySQL Server 5.7.
+It also assists you in creating new projects or new applications in an existing project.
+
+Choose what do you want to do:
+    - [1] Install Django
+    - [2] Create new Django Project
+    - [3] Create new Application in an existing Django Project
+    - [4] Clear all projects and restore default configuration
+    - [5] Exit
+
+Note: choose the corresponding number:
+```
+
